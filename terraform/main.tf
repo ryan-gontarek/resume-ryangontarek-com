@@ -211,11 +211,19 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 }
 
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
-  included_files = ["./code/**"] # anytime a file under ./code changes, trigger cloud build
+  included_files  = ["./code/**"] # anytime a file under ./code changes, trigger cloud build
   service_account = google_service_account.resume_ryangontarek_com_cloudbuild.id
-  trigger_template {
-    branch_name = "main"
-    repo_name   = "my-repo"
+  # trigger_template {
+  #   branch_name = "main"
+  #   repo_name   = "ryangontarek/resume-ryangontarek-com"
+  # }
+  github {
+    name  = "resume-ryangontarek-com"
+    owner = "ryan-gontarek"
+    push {
+      branch       = "^main$"
+      invert_regex = false
+    }
   }
   filename = "cloudbuild.yaml"
   # github {
