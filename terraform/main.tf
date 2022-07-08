@@ -211,6 +211,7 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 }
 
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
+  included_files = ["./code/**"]
   github {
     name  = local.name
     owner = "ryan-gontarek"
