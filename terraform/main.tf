@@ -222,13 +222,16 @@ resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
     }
   }
   build {
+    options {
+      logging = "CLOUD_LOGGING_ONLY"
+    }
     step {
       name = "gcr.io/cloud-builders/gsutil"
       args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
     }
     step {
       name = "gcr.io/cloud-builders/gcloud"
-      args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*"]
+      args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
     }
   }
 }
@@ -248,7 +251,17 @@ resource "google_project_iam_custom_role" "resume_ryangontarek_com_cloudbuild" {
   title       = "Resume Ryan Gontarek Com Cloud Build"
   description = "Role for cloud build to invalidate load balancer cache and upload files to s3"
   permissions = [
+    "logging.logEntries.create",
+    "storage.objects.list",
     "storage.objects.get",
-    "storage.objects.list"
+    # "orgpolicy.policy.get",
+    # "resourcemanager.projects.get",
+    # "resourcemanager.projects.list",
+    "storage.multipartUploads.abort",
+    "storage.multipartUploads.create",
+    "storage.multipartUploads.listParts",
+    "storage.objects.create",
+    "storage.objects.delete",
+    "compute.urlMaps.invalidateCache"
   ]
 }
