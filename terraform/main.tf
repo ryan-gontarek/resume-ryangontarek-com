@@ -211,7 +211,8 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 }
 
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
-  included_files = ["./code/**"]
+  included_files = ["./code/**"] # anytime a file under ./code changes, trigger cloud build
+  service_account = google_service_account.resume_ryangontarek_com_cloudbuild.id
   github {
     name  = local.name
     owner = "ryan-gontarek"
@@ -220,11 +221,34 @@ resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
       invert_regex = false
     }
   }
-
   build {
     step {
       name = "gcr.io/cloud-builders/gsutil"
       args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
     }
+    step {
+      name = "gcr.io/cloud-builders/gcloud"
+      args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*"]
+    }
   }
+}
+
+resource "google_service_account" "resume_ryangontarek_com_cloudbuild" {
+  account_id = "resume-ryangontarek-com"
+}
+
+resource "google_project_iam_member" "resume_ryangontarek_com_cloudbuild" {
+  project = local.project_id
+  role    = google_project_iam_custom_role.resume_ryangontarek_com_cloudbuild.id
+  member  = "serviceAccount:${google_service_account.resume_ryangontarek_com_cloudbuild.email}"
+}
+
+resource "google_project_iam_custom_role" "resume_ryangontarek_com_cloudbuild" {
+  role_id     = "resumeRyanGontarekComCloudBuild"
+  title       = "Resume Ryan Gontarek Com Cloud Build"
+  description = "Role for cloud build to invalidate load balancer cache and upload files to s3"
+  permissions = [
+    "storage.objects.get",
+    "storage.objects.list"
+  ]
 }
