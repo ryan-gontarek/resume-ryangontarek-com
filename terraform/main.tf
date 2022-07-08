@@ -211,12 +211,6 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 }
 
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
-  # trigger_template {
-  #   branch_name = "main"
-  #   repo_name   = local.name
-  # }
-  # filename = "cloudbuild.yaml"
-
   github {
     name  = local.name
     owner = "ryan-gontarek"
