@@ -108,7 +108,7 @@ data "aws_route53_zone" "ryangontarek_com" {
 }
 
 resource "aws_route53_record" "resume_ryangontarek_com_compute" {
-	# checkov:skip=CKV2_AWS_23: this resource should have an attached record
+  # checkov:skip=CKV2_AWS_23: this resource should have an attached record
   zone_id = data.aws_route53_zone.ryangontarek_com.zone_id
   name    = local.sub_domain
   type    = "A"
@@ -186,8 +186,8 @@ resource "google_compute_target_http_proxy" "resume_ryangontarek_com_http_redire
 resource "google_compute_url_map" "resume_ryangontarek_com_http_redirect" {
   name = "${local.name}-http-redirect"
   default_url_redirect {
-    strip_query            = false
-    https_redirect         = true
+    strip_query    = false
+    https_redirect = true
   }
 }
 
@@ -198,5 +198,38 @@ resource "google_compute_backend_bucket" "resume_ryangontarek_com" {
   enable_cdn  = true
   cdn_policy {
     cache_mode = "CACHE_ALL_STATIC"
+  }
+}
+
+################################################################
+###################### Cloud Build #############################
+################################################################
+
+resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
+  project = local.project_id
+  service = "cloudbuild.googleapis.com"
+}
+
+resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
+  # trigger_template {
+  #   branch_name = "main"
+  #   repo_name   = local.name
+  # }
+  # filename = "cloudbuild.yaml"
+
+  github {
+    name  = local.name
+    owner = "ryan-gontarek"
+    push {
+      branch       = "main"
+      invert_regex = false
+    }
+  }
+
+  build {
+    step {
+      name = "gcr.io/cloud-builders/gsutil"
+      args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
+    }
   }
 }
