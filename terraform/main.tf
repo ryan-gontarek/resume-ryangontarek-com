@@ -226,7 +226,7 @@ resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
       invert_regex = false
     }
   }
-  filename = "cloudbuild.yaml"
+  # filename = "cloudbuild.yaml"
   # github {
   #   name  = local.name
   #   owner = "ryan-gontarek"
@@ -235,19 +235,19 @@ resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
   #     invert_regex = false
   #   }
   # }
-  # build {
-  #   options {
-  #     logging = "CLOUD_LOGGING_ONLY"
-  #   }
-  #   step {
-  #     name = "gcr.io/cloud-builders/gsutil"
-  #     args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
-  #   }
-  #   step {
-  #     name = "gcr.io/cloud-builders/gcloud"
-  #     args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
-  #   }
-  # }
+  build {
+    options {
+      logging = "CLOUD_LOGGING_ONLY"
+    }
+    step {
+      name = "gcr.io/cloud-builders/gsutil"
+      args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
+    }
+    step {
+      name = "gcr.io/cloud-builders/gcloud"
+      args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
+    }
+  }
 }
 
 resource "google_service_account" "resume_ryangontarek_com_cloudbuild" {
