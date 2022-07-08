@@ -9,20 +9,31 @@ terraform {
       source  = "hashicorp/google"
       version = "4.27.0"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "4.21.0"
+    }
   }
-}
-
-locals {
-  name       = "resume-ryangontarek-com"
-  project_id = "resume-ryangontarek-com"
-  location   = "us-central1"
-  zone       = "us-central1-a"
 }
 
 provider "google" {
   credentials = file("~/.gcp/credentials/resume-ryangontarek-com.json")
   project     = "resume-ryangontarek-com"
   region      = "us-central1"
+}
+
+provider "aws" {
+  profile = "rgontarek"
+  region  = "us-east-1"
+}
+
+locals {
+  name        = "resume-ryangontarek-com"
+  project_id  = "resume-ryangontarek-com"
+  root_domain = "ryangontarek.com"
+  sub_domain  = "resume.ryangontarek.com"
+  location    = "us-central1"
+  zone        = "us-central1-a"
 }
 
 resource "google_storage_bucket" "backend" {
@@ -40,6 +51,10 @@ resource "google_storage_bucket" "backend" {
   uniform_bucket_level_access = true
 }
 
+
+################################################################
+################# Cloud Storage Website ########################
+################################################################
 resource "google_storage_bucket" "resume_ryangontarek_com" {
   # checkov:skip=CKV_GCP_62: I don't want this bucket to log acccess
   project       = local.project_id
@@ -51,7 +66,7 @@ resource "google_storage_bucket" "resume_ryangontarek_com" {
     not_found_page   = "404.html"
   }
   cors {
-    origin          = ["*"] # ["http://image-store.com"]
+    origin          = ["https://resume.ryangontarek.com"]
     method          = ["GET", "HEAD", "PUT", "POST", "DELETE"]
     response_header = ["*"]
     max_age_seconds = 3600
@@ -63,7 +78,7 @@ resource "google_storage_bucket" "resume_ryangontarek_com" {
   uniform_bucket_level_access = true
 }
 
-resource "google_project_service" "resume_ryangontarek_com" {
+resource "google_project_service" "resume_ryangontarek_com_iam" {
   project = local.project_id
   service = "iam.googleapis.com"
 }
@@ -83,4 +98,105 @@ resource "google_storage_bucket_iam_member" "resume_ryangontarek_com" {
   bucket = google_storage_bucket.resume_ryangontarek_com.name
   role   = google_project_iam_custom_role.resume_ryangontarek_com.id
   member = "allUsers"
+}
+
+################################################################
+##################### Load Balancer ############################
+################################################################
+data "aws_route53_zone" "ryangontarek_com" {
+  name = local.root_domain
+}
+
+resource "aws_route53_record" "resume_ryangontarek_com_compute" {
+	# checkov:skip=CKV2_AWS_23: this resource should have an attached record
+  zone_id = data.aws_route53_zone.ryangontarek_com.zone_id
+  name    = local.sub_domain
+  type    = "A"
+  ttl     = "300"
+  records = [google_compute_global_address.resume_ryangontarek_com.address]
+}
+
+resource "google_project_service" "resume_ryangontarek_com_compute" {
+  project = local.project_id
+  service = "compute.googleapis.com"
+}
+
+resource "google_project_service" "resume_ryangontarek_com_dns" {
+  project = local.project_id
+  service = "dns.googleapis.com"
+}
+
+resource "google_compute_global_address" "resume_ryangontarek_com" {
+  name         = local.name
+  address_type = "EXTERNAL"
+}
+
+resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com" {
+  name                  = local.name
+  load_balancing_scheme = "EXTERNAL"
+  port_range            = "443"
+  ip_address            = google_compute_global_address.resume_ryangontarek_com.id
+  target                = google_compute_target_https_proxy.resume_ryangontarek_com.id
+}
+
+resource "google_compute_target_https_proxy" "resume_ryangontarek_com" {
+  name             = local.name
+  ssl_certificates = [google_compute_managed_ssl_certificate.resume_ryangontarek_com.id]
+  url_map          = google_compute_url_map.resume_ryangontarek_com.id
+}
+
+resource "google_compute_managed_ssl_certificate" "resume_ryangontarek_com" {
+  name = local.name
+  managed {
+    domains = [local.sub_domain]
+  }
+}
+
+resource "google_compute_url_map" "resume_ryangontarek_com" {
+  name            = local.name
+  description     = "URL map from ingress to backend website bucket"
+  default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
+  host_rule {
+    hosts        = [local.sub_domain]
+    path_matcher = "allpaths"
+  }
+  path_matcher {
+    name            = "allpaths"
+    default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
+
+    path_rule {
+      paths   = ["/*"]
+      service = google_compute_backend_bucket.resume_ryangontarek_com.id
+    }
+  }
+}
+
+resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com_http_redirect" {
+  name       = "${local.name}-http-redirect"
+  ip_address = google_compute_global_address.resume_ryangontarek_com.address
+  target     = google_compute_target_http_proxy.resume_ryangontarek_com_http_redirect.self_link
+  port_range = "80"
+}
+
+resource "google_compute_target_http_proxy" "resume_ryangontarek_com_http_redirect" {
+  name    = "${local.name}-http-redirect"
+  url_map = google_compute_url_map.resume_ryangontarek_com_http_redirect.self_link
+}
+
+resource "google_compute_url_map" "resume_ryangontarek_com_http_redirect" {
+  name = "${local.name}-http-redirect"
+  default_url_redirect {
+    strip_query            = false
+    https_redirect         = true
+  }
+}
+
+resource "google_compute_backend_bucket" "resume_ryangontarek_com" {
+  name        = local.name
+  description = "Contains a beautiful resume"
+  bucket_name = google_storage_bucket.resume_ryangontarek_com.name
+  enable_cdn  = true
+  cdn_policy {
+    cache_mode = "CACHE_ALL_STATIC"
+  }
 }
