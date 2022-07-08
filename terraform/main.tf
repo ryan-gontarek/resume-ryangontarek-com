@@ -213,27 +213,32 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
   included_files = ["./code/**"] # anytime a file under ./code changes, trigger cloud build
   service_account = google_service_account.resume_ryangontarek_com_cloudbuild.id
-  github {
-    name  = local.name
-    owner = "ryan-gontarek"
-    push {
-      branch       = "main"
-      invert_regex = false
-    }
+  trigger_template {
+    branch_name = "main"
+    repo_name   = "my-repo"
   }
-  build {
-    options {
-      logging = "CLOUD_LOGGING_ONLY"
-    }
-    step {
-      name = "gcr.io/cloud-builders/gsutil"
-      args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
-    }
-    step {
-      name = "gcr.io/cloud-builders/gcloud"
-      args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
-    }
-  }
+  filename = "cloudbuild.yaml"
+  # github {
+  #   name  = local.name
+  #   owner = "ryan-gontarek"
+  #   push {
+  #     branch       = "main"
+  #     invert_regex = false
+  #   }
+  # }
+  # build {
+  #   options {
+  #     logging = "CLOUD_LOGGING_ONLY"
+  #   }
+  #   step {
+  #     name = "gcr.io/cloud-builders/gsutil"
+  #     args = ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
+  #   }
+  #   step {
+  #     name = "gcr.io/cloud-builders/gcloud"
+  #     args = ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
+  #   }
+  # }
 }
 
 resource "google_service_account" "resume_ryangontarek_com_cloudbuild" {
