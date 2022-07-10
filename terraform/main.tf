@@ -211,8 +211,8 @@ resource "google_project_service" "resume_ryangontarek_com_cloudbuild" {
 }
 
 resource "google_cloudbuild_trigger" "resume_ryangontarek_com" {
-  name            = "test17"
-  included_files  = ["./code/**"] # anytime a file under ./code changes, trigger cloud build
+  name            = local.name
+  included_files  = ["code/**"] # anytime a file under code/ changes, trigger cloud build
   service_account = google_service_account.resume_ryangontarek_com_cloudbuild.id
   github {
     name  = "resume-ryangontarek-com"
