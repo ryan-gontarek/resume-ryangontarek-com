@@ -1,3 +1,7 @@
+# tutorials
+# https://cloud.google.com/storage/docs/hosting-static-website-http
+# https://cloud.google.com/storage/docs/hosting-static-website
+
 terraform {
   backend "gcs" {
     credentials = "~/.gcp/credentials/resume-ryangontarek-com.json"
@@ -58,7 +62,7 @@ resource "google_storage_bucket" "backend" {
 resource "google_storage_bucket" "resume_ryangontarek_com" {
   # checkov:skip=CKV_GCP_62: I don't want this bucket to log acccess
   project       = local.project_id
-  name          = local.name
+  name          = "resume.ryangontarek.com"
   location      = local.location
   force_destroy = false
   website {
@@ -107,13 +111,13 @@ data "aws_route53_zone" "ryangontarek_com" {
   name = local.root_domain
 }
 
-resource "aws_route53_record" "resume_ryangontarek_com_compute" {
+resource "aws_route53_record" "resume_ryangontarek_com" {
   # checkov:skip=CKV2_AWS_23: this resource should have an attached record
   zone_id = data.aws_route53_zone.ryangontarek_com.zone_id
   name    = local.sub_domain
-  type    = "A"
+  type    = "CNAME"
   ttl     = "300"
-  records = [google_compute_global_address.resume_ryangontarek_com.address]
+  records = ["c.storage.googleapis.com"]
 }
 
 resource "google_project_service" "resume_ryangontarek_com_compute" {
@@ -126,80 +130,83 @@ resource "google_project_service" "resume_ryangontarek_com_dns" {
   service = "dns.googleapis.com"
 }
 
-resource "google_compute_global_address" "resume_ryangontarek_com" {
-  name         = local.name
-  address_type = "EXTERNAL"
-}
+#### load balancer was working with aws route53 'A' record and this public ip address
+#### but decided to just redirect with CNAME url to bucket index.html object because
+#### this load balancer proxy setup costs $14 per month
+# resource "google_compute_global_address" "resume_ryangontarek_com" {
+#   name         = local.name
+#   address_type = "EXTERNAL"
+# }
 
-resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com" {
-  name                  = local.name
-  load_balancing_scheme = "EXTERNAL"
-  port_range            = "443"
-  ip_address            = google_compute_global_address.resume_ryangontarek_com.id
-  target                = google_compute_target_https_proxy.resume_ryangontarek_com.id
-}
+# resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com" {
+#   name                  = local.name
+#   load_balancing_scheme = "EXTERNAL"
+#   port_range            = "443"
+#   ip_address            = google_compute_global_address.resume_ryangontarek_com.id
+#   target                = google_compute_target_https_proxy.resume_ryangontarek_com.id
+# }
 
-resource "google_compute_target_https_proxy" "resume_ryangontarek_com" {
-  name             = local.name
-  ssl_certificates = [google_compute_managed_ssl_certificate.resume_ryangontarek_com.id]
-  url_map          = google_compute_url_map.resume_ryangontarek_com.id
-}
+# resource "google_compute_target_https_proxy" "resume_ryangontarek_com" {
+#   name             = local.name
+#   ssl_certificates = [google_compute_managed_ssl_certificate.resume_ryangontarek_com.id]
+#   url_map          = google_compute_url_map.resume_ryangontarek_com.id
+# }
 
-resource "google_compute_managed_ssl_certificate" "resume_ryangontarek_com" {
-  name = local.name
-  managed {
-    domains = [local.sub_domain]
-  }
-}
+# resource "google_compute_managed_ssl_certificate" "resume_ryangontarek_com" {
+#   name = local.name
+#   managed {
+#     domains = [local.sub_domain]
+#   }
+# }
 
-resource "google_compute_url_map" "resume_ryangontarek_com" {
-  name            = local.name
-  description     = "URL map from ingress to backend website bucket"
-  default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
-  host_rule {
-    hosts        = [local.sub_domain]
-    path_matcher = "allpaths"
-  }
-  path_matcher {
-    name            = "allpaths"
-    default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
+# resource "google_compute_url_map" "resume_ryangontarek_com" {
+#   name            = local.name
+#   description     = "URL map from ingress to backend website bucket"
+#   default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
+#   host_rule {
+#     hosts        = [local.sub_domain]
+#     path_matcher = "allpaths"
+#   }
+#   path_matcher {
+#     name            = "allpaths"
+#     default_service = google_compute_backend_bucket.resume_ryangontarek_com.id
 
-    path_rule {
-      paths   = ["/*"]
-      service = google_compute_backend_bucket.resume_ryangontarek_com.id
-    }
-  }
-}
+#     path_rule {
+#       paths   = ["/*"]
+#       service = google_compute_backend_bucket.resume_ryangontarek_com.id
+#     }
+#   }
+# }
 
-resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com_http_redirect" {
-  name       = "${local.name}-http-redirect"
-  ip_address = google_compute_global_address.resume_ryangontarek_com.address
-  target     = google_compute_target_http_proxy.resume_ryangontarek_com_http_redirect.self_link
-  port_range = "80"
-}
+# resource "google_compute_global_forwarding_rule" "resume_ryangontarek_com_http_redirect" {
+#   name       = "${local.name}-http-redirect"
+#   ip_address = google_compute_global_address.resume_ryangontarek_com.address
+#   target     = google_compute_target_http_proxy.resume_ryangontarek_com_http_redirect.self_link
+#   port_range = "80"
+# }
 
-resource "google_compute_target_http_proxy" "resume_ryangontarek_com_http_redirect" {
-  name    = "${local.name}-http-redirect"
-  url_map = google_compute_url_map.resume_ryangontarek_com_http_redirect.self_link
-}
+# resource "google_compute_target_http_proxy" "resume_ryangontarek_com_http_redirect" {
+#   name    = "${local.name}-http-redirect"
+#   url_map = google_compute_url_map.resume_ryangontarek_com_http_redirect.self_link
+# }
 
-resource "google_compute_url_map" "resume_ryangontarek_com_http_redirect" {
-  name = "${local.name}-http-redirect"
-  default_url_redirect {
-    strip_query    = false
-    https_redirect = true
-  }
-}
+# resource "google_compute_url_map" "resume_ryangontarek_com_http_redirect" {
+#   name = "${local.name}-http-redirect"
+#   default_url_redirect {
+#     strip_query    = false
+#     https_redirect = true
+#   }
+# }
 
-resource "google_compute_backend_bucket" "resume_ryangontarek_com" {
-  name        = local.name
-  description = "Contains a beautiful resume"
-  bucket_name = google_storage_bucket.resume_ryangontarek_com.name
-  enable_cdn  = true
-  cdn_policy {
-    cache_mode = "CACHE_ALL_STATIC"
-  }
-}
+# resource "google_compute_backend_bucket" "resume_ryangontarek_com" {
+#   name        = local.name
+#   description = "Contains a beautiful resume"
+#   bucket_name = google_storage_bucket.resume_ryangontarek_com.name
+#   enable_cdn  = true
+#   cdn_policy {
+#     cache_mode = "CACHE_ALL_STATIC"
+#   }
+# }
 
 ################################################################
 ###################### Cloud Build #############################
@@ -254,4 +261,3 @@ resource "google_project_iam_custom_role" "resume_ryangontarek_com_cloudbuild" {
     "compute.urlMaps.invalidateCache"
   ]
 }
-

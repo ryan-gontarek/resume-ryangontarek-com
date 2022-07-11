@@ -2,6 +2,6 @@ options:
   logging: CLOUD_LOGGING_ONLY
 steps:
 - name: "gcr.io/cloud-builders/gsutil"
-  args: ["rsync", "-r", "./code/", "gs://resume-ryangontarek-com/"]
-- name: "gcr.io/cloud-builders/gcloud"
-  args: ["compute", "url-maps", "invalidate-cdn-cache", "resume-ryangontarek-com", "--path", "/*", "--async"]
+  args: ["rsync", "-r", "./code/", "gs://resume.ryangontarek.com/"]
+# - name: "gcr.io/cloud-builders/gcloud"
+#   args: ["compute", "url-maps", "invalidate-cdn-cache", "resume.ryangontarek.com", "--path", "/*", "--async"]
